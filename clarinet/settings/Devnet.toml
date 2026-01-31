@@ -1,0 +1,34 @@
+[network]
+name = "devnet"
+stacks_node_rpc_address = "http://localhost:20443"
+deployment_fee_rate = 10
+
+[accounts.deployer]
+mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+balance = 100_000_000_000_000
+stx_address = "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+btc_address = "mqVnk6NPRdhntvfm4hh9vvjiRkFDUuSYsH"
+
+[accounts.wallet_1]
+mnemonic = "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong"
+balance = 100_000_000_000_000
+stx_address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5"
+btc_address = "mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC"
+
+[accounts.wallet_2]
+mnemonic = "letter advice cage absurd amount doctor acoustic avoid letter advice cage above"
+balance = 100_000_000_000_000
+stx_address = "ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG"
+btc_address = "muYdXKmX9bByj81L8fFHUMbWE8C6pUPb1Y"
+
+[accounts.wallet_3]
+mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon agent"
+balance = 100_000_000_000_000
+stx_address = "ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC"
+btc_address = "mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7"
+
+[accounts.faucet]
+mnemonic = "legal winner thank year wave sausage worth useful legal winner thank yellow"
+balance = 100_000_000_000_000
+stx_address = "STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6"
+btc_address = "mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d"

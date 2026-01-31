@@ -5,6 +5,7 @@
  */
 
 import { ContractDeployer } from "../contracts/deployer";
+import { ContractValidator } from "../contracts/validator";
 import {
   DAOStatus,
   DEFAULT_DAO_CONFIG,
@@ -25,6 +26,7 @@ import type {
 
 export class DAOFactory {
   private deployer: ContractDeployer;
+  private validator: ContractValidator;
   private proposals: Map<number, DAOProposal> = new Map();
   private proposalCounter = 0;
 
@@ -33,10 +35,12 @@ export class DAOFactory {
 
   constructor(
     deployer: ContractDeployer,
-    verifierAddress: string
+    verifierAddress: string,
+    clarinetDir: string = "./clarinet"
   ) {
     this.deployer = deployer;
     this.verifierAddress = verifierAddress;
+    this.validator = new ContractValidator(clarinetDir);
   }
 
   // ============================================================
@@ -223,6 +227,17 @@ export class DAOFactory {
       return { success: false, message: "Insufficient STX for deployment" };
     }
 
+    // Validate contracts with Clarinet before deployment
+    console.log("[deploy] Validating contracts with Clarinet...");
+    const validation = await this.validator.validate(proposal.config);
+    if (!validation.valid) {
+      return {
+        success: false,
+        message: `Contract validation failed:\n${validation.errors.join("\n")}`,
+      };
+    }
+    console.log("[deploy] Contracts validated successfully");
+
     // Finalize allocations
     this.finalizeAllocations(daoId);
 
@@ -389,6 +404,48 @@ export class DAOFactory {
     });
 
     return allocations;
+  }
+
+  // ============================================================
+  // Validation
+  // ============================================================
+
+  /**
+   * Validate contracts without deploying.
+   */
+  async validateContracts(daoId: number): Promise<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  }> {
+    const proposal = this.proposals.get(daoId);
+    if (!proposal) {
+      return { valid: false, errors: ["Proposal not found"], warnings: [] };
+    }
+
+    const result = await this.validator.validate(proposal.config);
+    return {
+      valid: result.valid,
+      errors: result.errors,
+      warnings: result.warnings,
+    };
+  }
+
+  /**
+   * Run tests for contracts.
+   */
+  async testContracts(daoId: number): Promise<{
+    passed: boolean;
+    total: number;
+    failed: number;
+    output: string;
+  }> {
+    const proposal = this.proposals.get(daoId);
+    if (!proposal) {
+      return { passed: false, total: 0, failed: 1, output: "Proposal not found" };
+    }
+
+    return await this.validator.test(proposal.config);
   }
 
   // ============================================================

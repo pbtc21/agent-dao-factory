@@ -1,0 +1,34 @@
+[project]
+name = "agent-dao"
+description = "Agent DAO contracts validation"
+authors = ["agent-dao-factory"]
+telemetry = false
+cache_dir = "./.cache"
+requirements = []
+
+[contracts.sip-010-trait]
+path = "contracts/sip-010-trait.clar"
+clarity_version = 3
+epoch = 3.0
+
+[contracts.agent-token]
+path = "contracts/agent-token.clar"
+clarity_version = 3
+epoch = 3.0
+depends_on = ["sip-010-trait"]
+
+[contracts.agent-treasury]
+path = "contracts/agent-treasury.clar"
+clarity_version = 3
+epoch = 3.0
+depends_on = ["agent-token", "sip-010-trait"]
+
+[contracts.agent-governance]
+path = "contracts/agent-governance.clar"
+clarity_version = 3
+epoch = 3.0
+depends_on = ["agent-token", "agent-treasury"]
+
+[repl.analysis]
+passes = ["check_checker"]
+check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
