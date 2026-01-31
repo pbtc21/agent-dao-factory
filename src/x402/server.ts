@@ -95,6 +95,8 @@ function generatePaymentRequired(config: X402Config): Record<string, string> {
 /**
  * Create x402 middleware for Hono.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export function x402Middleware(config: X402Config) {
   return async (c: any, next: () => Promise<void>) => {
     // Skip if x402 disabled
@@ -188,7 +190,7 @@ export function createDAOServiceAPI(config: X402Config) {
       address,
       githubRepo,
       trustLevel: "basic",
-      payment: c.get("payment"),
+      payment: (c as any).get("payment"),
     });
   });
 
@@ -201,7 +203,7 @@ export function createDAOServiceAPI(config: X402Config) {
       success: true,
       message: "DAO creation queued",
       estimatedDeployTime: "~15 minutes",
-      payment: c.get("payment"),
+      payment: (c as any).get("payment"),
     });
   });
 
@@ -213,7 +215,7 @@ export function createDAOServiceAPI(config: X402Config) {
       daoId,
       name: "Example DAO",
       status: "deployed",
-      payment: c.get("payment"),
+      payment: (c as any).get("payment"),
     });
   });
 

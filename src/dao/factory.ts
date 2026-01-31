@@ -5,15 +5,17 @@
  */
 
 import { ContractDeployer } from "../contracts/deployer";
+import {
+  DAOStatus,
+  DEFAULT_DAO_CONFIG,
+} from "../types";
 import type {
   DAOConfig,
   DAOProposal,
-  DAOStatus,
   Participant,
   DeploymentResult,
   TokenAllocation,
   X402Config,
-  DEFAULT_DAO_CONFIG,
   GovernancePhase,
 } from "../types";
 

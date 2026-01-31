@@ -139,10 +139,7 @@ export class ContractDeployer {
     });
 
     // Broadcast
-    const result = await broadcastTransaction({
-      transaction,
-      network: this.stacksNetwork,
-    });
+    const result = await broadcastTransaction(transaction, this.stacksNetwork);
 
     if ("error" in result) {
       throw new Error(`Deploy failed: ${result.error}`);
@@ -193,10 +190,7 @@ export class ContractDeployer {
       postConditionMode: PostConditionMode.Allow,
     });
 
-    const result = await broadcastTransaction({
-      transaction,
-      network: this.stacksNetwork,
-    });
+    const result = await broadcastTransaction(transaction, this.stacksNetwork);
 
     if ("error" in result) {
       throw new Error(`Call failed: ${result.error}`);
