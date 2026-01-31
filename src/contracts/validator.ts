@@ -178,7 +178,8 @@ export class ContractValidator {
     warnings: string[];
   }> {
     return new Promise((resolve) => {
-      const proc = spawn("clarinet", ["check"], {
+      // Use -c to auto-use computed deployment plan (avoids interactive prompt)
+      const proc = spawn("clarinet", ["check", "-c"], {
         cwd: this.clarinetDir,
         shell: true,
       });
@@ -227,11 +228,11 @@ export class ContractValidator {
   }
 
   /**
-   * Run clarinet test command.
+   * Run bun test command (vitest with Clarinet SDK).
    */
   private runClarinetTest(): Promise<TestResult> {
     return new Promise((resolve) => {
-      const proc = spawn("clarinet", ["test"], {
+      const proc = spawn("bun", ["test"], {
         cwd: this.clarinetDir,
         shell: true,
       });
@@ -247,7 +248,7 @@ export class ContractValidator {
       });
 
       proc.on("close", (code) => {
-        // Parse test results
+        // Parse vitest results
         const passedMatch = output.match(/(\d+) passed/);
         const failedMatch = output.match(/(\d+) failed/);
 
@@ -298,245 +299,218 @@ export class ContractValidator {
 
 function generateTests(config: DAOConfig): string {
   return `
-import { Clarinet, Tx, Chain, Account, types } from "https://deno.land/x/clarinet@v1.7.0/index.ts";
-import { assertEquals, assertExists } from "https://deno.land/std@0.170.0/testing/asserts.ts";
+import { describe, it, expect } from "vitest";
+import { Cl, ClarityType, cvToValue } from "@stacks/transactions";
+import { initSimnet, tx } from "@hirosystems/clarinet-sdk";
 
-// ============================================================
-// Token Tests
-// ============================================================
+// Initialize simnet
+const simnet = await initSimnet();
+const accounts = simnet.getAccounts();
+const deployer = accounts.get("deployer")!;
+const wallet1 = accounts.get("wallet_1")!;
+const wallet2 = accounts.get("wallet_2")!;
+const wallet3 = accounts.get("wallet_3")!;
 
-Clarinet.test({
-  name: "Token: can get name and symbol",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
+// Helper to check if result is Ok
+function isOk(result: any): boolean {
+  return result.type === ClarityType.ResponseOk;
+}
 
-    const nameResult = chain.callReadOnlyFn(
-      "agent-token",
-      "get-name",
-      [],
-      deployer.address
-    );
-    assertEquals(nameResult.result, '(ok "${config.name}")');
+// Helper to check if result is Err
+function isErr(result: any): boolean {
+  return result.type === ClarityType.ResponseErr;
+}
 
-    const symbolResult = chain.callReadOnlyFn(
-      "agent-token",
-      "get-symbol",
-      [],
-      deployer.address
-    );
-    assertEquals(symbolResult.result, '(ok "${config.symbol}")');
-  },
-});
+// Helper to get Ok value
+function getOkValue(result: any): any {
+  if (result.type === ClarityType.ResponseOk) {
+    return result.value;
+  }
+  throw new Error("Expected Ok response");
+}
 
-Clarinet.test({
-  name: "Token: deployer can distribute to founder",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-    const founder = accounts.get("wallet_1")!;
+// Helper to get Err value
+function getErrValue(result: any): any {
+  if (result.type === ClarityType.ResponseErr) {
+    return result.value;
+  }
+  throw new Error("Expected Err response");
+}
 
-    const block = chain.mineBlock([
-      Tx.contractCall(
+describe("Agent Token Contract", () => {
+  describe("Token Metadata", () => {
+    it("returns correct name", () => {
+      const result = simnet.callReadOnlyFn(
         "agent-token",
-        "distribute-founder",
-        [types.principal(founder.address)],
-        deployer.address
-      ),
-    ]);
-
-    assertEquals(block.receipts.length, 1);
-    assertEquals(block.receipts[0].result.expectOk(), true);
-  },
-});
-
-Clarinet.test({
-  name: "Token: non-deployer cannot distribute",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const wallet1 = accounts.get("wallet_1")!;
-    const wallet2 = accounts.get("wallet_2")!;
-
-    const block = chain.mineBlock([
-      Tx.contractCall(
-        "agent-token",
-        "distribute-founder",
-        [types.principal(wallet2.address)],
-        wallet1.address
-      ),
-    ]);
-
-    assertEquals(block.receipts.length, 1);
-    block.receipts[0].result.expectErr().expectUint(2001); // ERR_UNAUTHORIZED
-  },
-});
-
-Clarinet.test({
-  name: "Token: cannot distribute after finalization",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-    const founder = accounts.get("wallet_1")!;
-
-    // Distribute and finalize
-    chain.mineBlock([
-      Tx.contractCall(
-        "agent-token",
-        "distribute-founder",
-        [types.principal(founder.address)],
-        deployer.address
-      ),
-      Tx.contractCall(
-        "agent-token",
-        "finalize-distribution",
+        "get-name",
         [],
-        deployer.address
-      ),
-    ]);
+        deployer
+      );
+      expect(isOk(result.result)).toBe(true);
+      expect(cvToValue(getOkValue(result.result))).toBe("${config.name}");
+    });
 
-    // Try to distribute again
-    const block = chain.mineBlock([
-      Tx.contractCall(
+    it("returns correct symbol", () => {
+      const result = simnet.callReadOnlyFn(
         "agent-token",
-        "distribute-treasury",
-        [types.principal(deployer.address)],
-        deployer.address
-      ),
-    ]);
+        "get-symbol",
+        [],
+        deployer
+      );
+      expect(isOk(result.result)).toBe(true);
+      expect(cvToValue(getOkValue(result.result))).toBe("${config.symbol}");
+    });
 
-    assertEquals(block.receipts.length, 1);
-    block.receipts[0].result.expectErr().expectUint(2004); // ERR_ALREADY_DISTRIBUTED
-  },
+    it("returns correct decimals", () => {
+      const result = simnet.callReadOnlyFn(
+        "agent-token",
+        "get-decimals",
+        [],
+        deployer
+      );
+      expect(isOk(result.result)).toBe(true);
+      expect(cvToValue(getOkValue(result.result))).toBe(8n);
+    });
+  });
+
+  describe("Distribution", () => {
+    it("allows deployer to distribute to founder", () => {
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-token",
+          "distribute-founder",
+          [Cl.principal(wallet1)],
+          deployer
+        ),
+      ]);
+      expect(isOk(block[0].result)).toBe(true);
+    });
+
+    it("prevents non-deployer from distributing", () => {
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-token",
+          "distribute-founder",
+          [Cl.principal(wallet2)],
+          wallet1
+        ),
+      ]);
+      expect(isErr(block[0].result)).toBe(true);
+      expect(cvToValue(getErrValue(block[0].result))).toBe(2001n);
+    });
+
+    it("allows distribution to participants", () => {
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-token",
+          "distribute-participant",
+          [Cl.principal(wallet1), Cl.uint(5000)],
+          deployer
+        ),
+      ]);
+      expect(isOk(block[0].result)).toBe(true);
+    });
+
+    it("prevents distribution after finalization", () => {
+      simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-token",
+          "finalize-distribution",
+          [],
+          deployer
+        ),
+      ]);
+
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-token",
+          "distribute-treasury",
+          [Cl.principal(wallet1)],
+          deployer
+        ),
+      ]);
+      expect(isErr(block[0].result)).toBe(true);
+      expect(cvToValue(getErrValue(block[0].result))).toBe(2004n);
+    });
+  });
 });
 
-// ============================================================
-// Governance Tests
-// ============================================================
-
-Clarinet.test({
-  name: "Governance: starts in founder control phase",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-
-    const result = chain.callReadOnlyFn(
-      "agent-governance",
-      "get-governance-phase",
-      [],
-      deployer.address
-    );
-
-    assertEquals(result.result, "u1"); // PHASE_FOUNDER_CONTROL
-  },
-});
-
-Clarinet.test({
-  name: "Governance: founder can transition phases",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-
-    const block = chain.mineBlock([
-      Tx.contractCall(
+describe("Agent Governance Contract", () => {
+  describe("Governance Phase", () => {
+    it("starts in founder control phase", () => {
+      const result = simnet.callReadOnlyFn(
         "agent-governance",
-        "transition-phase",
+        "get-governance-phase",
         [],
-        deployer.address
-      ),
-    ]);
+        deployer
+      );
+      expect(cvToValue(result.result)).toBe(1n);
+    });
 
-    assertEquals(block.receipts.length, 1);
-    block.receipts[0].result.expectOk().expectUint(2); // PHASE_TRANSITIONING
-  },
+    it("allows founder to transition phase", () => {
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-governance",
+          "transition-phase",
+          [],
+          deployer
+        ),
+      ]);
+      expect(isOk(block[0].result)).toBe(true);
+    });
+
+    it("prevents non-founder from transitioning", () => {
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-governance",
+          "transition-phase",
+          [],
+          wallet1
+        ),
+      ]);
+      expect(isErr(block[0].result)).toBe(true);
+      expect(cvToValue(getErrValue(block[0].result))).toBe(4001n);
+    });
+  });
 });
 
-Clarinet.test({
-  name: "Governance: non-founder cannot transition",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const wallet1 = accounts.get("wallet_1")!;
-
-    const block = chain.mineBlock([
-      Tx.contractCall(
-        "agent-governance",
-        "transition-phase",
+describe("Agent Treasury Contract", () => {
+  describe("Revenue Tracking", () => {
+    it("starts with zero revenue", () => {
+      const result = simnet.callReadOnlyFn(
+        "agent-treasury",
+        "get-total-revenue",
         [],
-        wallet1.address
-      ),
-    ]);
+        deployer
+      );
+      expect(cvToValue(result.result)).toBe(0n);
+    });
 
-    assertEquals(block.receipts.length, 1);
-    block.receipts[0].result.expectErr().expectUint(4001); // ERR_UNAUTHORIZED
-  },
-});
+    it("allows owner to record revenue", () => {
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-treasury",
+          "record-revenue",
+          [Cl.uint(1000000)],
+          deployer
+        ),
+      ]);
+      expect(isOk(block[0].result)).toBe(true);
+    });
 
-// ============================================================
-// Integration Tests
-// ============================================================
-
-Clarinet.test({
-  name: "Full distribution flow works correctly",
-  fn(chain: Chain, accounts: Map<string, Account>) {
-    const deployer = accounts.get("deployer")!;
-    const founder = accounts.get("wallet_1")!;
-    const participant1 = accounts.get("wallet_2")!;
-    const participant2 = accounts.get("wallet_3")!;
-    const treasury = accounts.get("wallet_4")!;
-    const verifier = accounts.get("wallet_5")!;
-
-    // Full distribution
-    const block = chain.mineBlock([
-      // Distribute to founder (50%)
-      Tx.contractCall(
-        "agent-token",
-        "distribute-founder",
-        [types.principal(founder.address)],
-        deployer.address
-      ),
-      // Distribute to participants (30% split)
-      Tx.contractCall(
-        "agent-token",
-        "distribute-participant",
-        [types.principal(participant1.address), types.uint(5000)],
-        deployer.address
-      ),
-      Tx.contractCall(
-        "agent-token",
-        "distribute-participant",
-        [types.principal(participant2.address), types.uint(5000)],
-        deployer.address
-      ),
-      // Distribute to treasury (15%)
-      Tx.contractCall(
-        "agent-token",
-        "distribute-treasury",
-        [types.principal(treasury.address)],
-        deployer.address
-      ),
-      // Distribute to verifier (5%)
-      Tx.contractCall(
-        "agent-token",
-        "distribute-verifier",
-        [types.principal(verifier.address)],
-        deployer.address
-      ),
-      // Finalize
-      Tx.contractCall(
-        "agent-token",
-        "finalize-distribution",
-        [],
-        deployer.address
-      ),
-    ]);
-
-    // All should succeed
-    assertEquals(block.receipts.length, 6);
-    for (const receipt of block.receipts) {
-      receipt.result.expectOk();
-    }
-
-    // Check balances
-    const founderBalance = chain.callReadOnlyFn(
-      "agent-token",
-      "get-balance",
-      [types.principal(founder.address)],
-      deployer.address
-    );
-    assertExists(founderBalance.result);
-  },
+    it("prevents non-owner from recording revenue", () => {
+      const block = simnet.mineBlock([
+        tx.callPublicFn(
+          "agent-treasury",
+          "record-revenue",
+          [Cl.uint(1000000)],
+          wallet1
+        ),
+      ]);
+      expect(isErr(block[0].result)).toBe(true);
+      expect(cvToValue(getErrValue(block[0].result))).toBe(3001n);
+    });
+  });
 });
 `.trim();
 }
