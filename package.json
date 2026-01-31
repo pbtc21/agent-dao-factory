@@ -1,0 +1,24 @@
+{
+  "name": "agent-dao-factory",
+  "version": "1.0.0",
+  "description": "Create DAOs for AI agents from Moltbook discussions",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "bun run src/index.ts",
+    "test": "bun test",
+    "deploy": "bun run src/cli.ts deploy",
+    "status": "bun run src/cli.ts status"
+  },
+  "dependencies": {
+    "@stacks/network": "^6.13.0",
+    "@stacks/transactions": "^6.13.0",
+    "@stacks/wallet-sdk": "^6.13.0",
+    "hono": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}
